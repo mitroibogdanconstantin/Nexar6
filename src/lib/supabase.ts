@@ -812,6 +812,25 @@ export const listings = {
 
 			if (profileError || !profile) {
 				console.error("❌ Profile not found:", profileError);
+				
+				// FIXED: Try to create profile if it doesn't exist
+				console.log("🔧 Attempting to create missing profile...");
+				try {
+					const newProfile = await ensureProfileExists(user);
+					if (newProfile) {
+						console.log("✅ Profile created successfully, retrying listing creation...");
+						// Use the newly created profile
+						const profileToUse = {
+							id: newProfile.id,
+							name: newProfile.name,
+							seller_type: newProfile.seller_type
+						};
+						return await this.createWithProfile(listing, images, user, profileToUse);
+					}
+				} catch (createError) {
+					console.error("❌ Failed to create profile:", createError);
+				}
+				
 				throw new Error(
 					"Profilul utilizatorului nu a fost găsit. Te rugăm să-ți completezi profilul mai întâi.",
 				);
@@ -819,6 +838,16 @@ export const listings = {
 
 			console.log("✅ Profile found:", profile);
 
+			return await this.createWithProfile(listing, images, user, profile);
+		} catch (error: any) {
+			console.error("💥 Error in listings.create:", error);
+			return { data: null, error: error };
+		}
+	},
+
+	// FIXED: Separate method to handle listing creation with profile
+	createWithProfile: async (listing: Partial<Listing>, images: File[], user: any, profile: any) => {
+		try {
 			// 3. Încărcăm imaginile în storage (dacă există)
 			const imageUrls: string[] = [];
 
@@ -864,7 +893,7 @@ export const listings = {
 			const listingData = {
 				...listing,
 				id: uuidv4(),
-				seller_id: profile.id, // Folosim ID-ul din profiles, nu din auth.users
+				seller_id: profile.id, // Folosim ID-ul din profiles
 				seller_name: profile.name,
 				seller_type: profile.seller_type,
 				images: imageUrls,
@@ -894,7 +923,7 @@ export const listings = {
 			console.log("✅ Listing created successfully:", data.id);
 			return { data, error: null };
 		} catch (err: any) {
-			console.error("💥 Error in listings.create:", err);
+			console.error("💥 Error in createWithProfile:", err);
 			return { data: null, error: err };
 		}
 	},
